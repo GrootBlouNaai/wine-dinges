@@ -1,0 +1,71 @@
+#https://github.com/lutris/lutris/issues/1625
+
+#Might need libd3dadapter9-mesa libd3dadapter9-mesa:i386
+#From the Requirements section in the Gallium Nine Standalone README:
+
+        A Gallium based graphics driver (Mesa 3D)
+        Mesa's Gallium Nine state tracker (d3dadapter9.so)
+
+#
+# $1 - gallium nine standalone archive name (required)
+helper_galliumnine()
+{
+    _W_galliumnine_archive="${1}"
+    _W_galliumnine_tmp="${W_TMP}/galliumnine"
+
+    w_try rm -rf "${_W_galliumnine_tmp}"
+    w_try mkdir -p "${_W_galliumnine_tmp}"
+    w_try tar -C "${_W_galliumnine_tmp}" --strip-components=1 -zxf "${W_CACHE}/${W_PACKAGE}/${_W_galliumnine_archive}"
+    w_try mv "${_W_galliumnine_tmp}/lib32/d3d9-nine.dll.so" "${W_SYSTEM32_DLLS}/d3d9-nine.dll"
+    w_try mv "${_W_galliumnine_tmp}/bin32/ninewinecfg.exe.so" "${W_SYSTEM32_DLLS}/ninewinecfg.exe"
+    if test "${W_ARCH}" = "win64"; then
+        w_try mv "${_W_galliumnine_tmp}/lib64/d3d9-nine.dll.so" "${W_SYSTEM64_DLLS}/d3d9-nine.dll"
+        w_try mv "${_W_galliumnine_tmp}/bin64/ninewinecfg.exe.so" "${W_SYSTEM64_DLLS}/ninewinecfg.exe"
+    fi
+    w_try rm -rf "${_W_galliumnine_tmp}"
+    # use ninewinecfg to enable gallium nine
+    WINEDEBUG=-all w_try "${WINE_MULTI}" ninewinecfg -e
+
+    unset _W_galliumnine_tmp _W_galliumnine_archive
+}
+
+load_galliumnine()
+{
+    _W_galliumnine_version="$(w_get_github_latest_release iXit wine-nine-standalone)"
+    w_linkcheck_ignore=1 w_download "https://github.com/iXit/wine-nine-standalone/releases/download/${_W_galliumnine_version}/gallium-nine-standalone-${_W_galliumnine_version}.tar.gz"
+    helper_galliumnine "gallium-nine-standalone-${_W_galliumnine_version}.tar.gz"
+    unset _W_galliumnine_version
+}
+
+
+
+
+
+
+
+
+#
+
+
+
+
+    installing Nine to current prefix - copy d3d9-nine.dll and ninewinecfg.exe provided by distribution package into C:\Windows\System32 of current (32 bit) prefix
+    enabling Nine - To enable Gallium Nine one has to run command ninewinecfg.exe -e or enable it manually (we will lost the original d3d9.dll file in system32, but it probably does not matter):
+        set key: HKEY_CURRENT_USER : Software\Wine\DllOverrides : d3d9 to native
+        create symlink C:\Windows\System32\d3d9.dll -> C:\Windows\System32\d3d9-nine.dll
+    disabling Nine - To disable Nine, simply run ninewinecfg.exe -d or do following:
+        delete key: HKEY_CURRENT_USER : Software\Wine\DllOverrides : d3d9
+        delete file C:\Windows\System32\d3d9.dll
+    checking current status: there is no util for this, but we can do it manually. Gallium Nine is enabled in following conditions:
+        HKEY_CURRENT_USER : Software\Wine\DllOverrides : d3d9 is native
+        C:\Windows\System32\d3d9.dll is symlink and file C:\Windows\System32\d3d9.dll exists
+
+So far it is simple task, but one also need to know if Gallium Nine is supported on current system. Gallium Nine requires following setup:
+
+    MESA with Gallium Nine support (checking /usr/lib/d3d/d3dadapter9.so or similar path should be enough)
+    Installed Gallium Nine Standalone (may be installed with Lutris in future), one may check if d3d9-nine.dll and ninewinecfg.exe are present in system directory (/usr/lib32/wine/ for example)
+    Chosen MESA driver supports Gallium Nine - ninewinecfg is checking this by calling Direct3DCreate9Ex() function from d3d9-nine.dll. I think we will need to do the same.
+
+TLDR - the biggest problem I have at the moment is checking current MESA driver against Gallium Nine. The problem is that user can enable Gallium Nine when he has selected AMD GPU (by DRI_PRIME) and then start game with different graphics card (like disabling DRI_PRIME in Lutris, which will activate Intel GPU for my setup for example). The game will not be able to create D3D9 device - in this situation Lutris should fall back to setup with disabled Gallium Nine.
+
+How to handle this situation? Check result of Direct3DCreate9Ex every time the game starts (we will need simple WIN32 binary for that) with enabled Gallium Nine, and disable it in case of error? Or do a list of available graphics cards on user's PC (Lutris is already doing in startup.check_driver) and test every GPU for Gallium Nine support on startup (that means calling Direct3DCreate9Ex during startup only and not every time some game is started with enabled Gallium Nine support)?
