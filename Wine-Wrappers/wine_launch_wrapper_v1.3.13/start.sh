@@ -338,179 +338,51 @@ list_game_info_content() {
   done
 }
 
-## A function to download winetricks
-## It's only used if the winetricks_list.txt file exists
-## Or if the script is launched with the --tricks argument
-
 download_winetricks() {
-	unset missing_deps
-	winetricks_deps="wget cabextract"
+  unset missing_deps
+  winetricks_deps="wget cabextract"
 
-	for i in ${winetricks_deps}; do
-		if ! command -v ${i} 1>/dev/null; then
-			missing_deps="${i} ${missing_deps}"
-		fi
-	done
+  for i in ${winetricks_deps}; do
+    if ! command -v ${i} 1>/dev/null; then
+      missing_deps="${i} ${missing_deps}"
+    fi
+  done
 
-	if [ -n "${missing_deps}" ]; then
-		echo "Please install these packages: ${missing_deps}"
-		echo "After that run the script again"
-		return 1
-	fi
+  if [ -n "${missing_deps}" ]; then
+    echo "Please install these packages: ${missing_deps}"
+    echo "After that run the script again"
+    return 1
+  fi
 
-	if [ ! -s winetricks ]; then
-		rm -f winetricks
+  if [ ! -s winetricks ]; then
+    rm -f winetricks
 
-		echo "Downloading winetricks..."
-		wget -q -O winetricks "https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks"
-	fi
+    echo "Downloading winetricks..."
+    wget -q -O winetricks "https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks"
+  fi
 
-	if [ -s winetricks ]; then
-		if [ ! -x winetricks ]; then
-			chmod +x winetricks
-		fi
+  if [ -s winetricks ]; then
+    if [ ! -x winetricks ]; then
+      chmod +x winetricks
+    fi
 
-		if [ ! -L "${XDG_CACHE_HOME}"/winetricks ]; then
-			if [ -d "${XDG_CACHE_HOME}"/winetricks ]; then
-				rm -rf "${XDG_CACHE_HOME}"/winetricks
-			fi
+    if [ ! -L "${XDG_CACHE_HOME}"/winetricks ]; then
+      if [ -d "${XDG_CACHE_HOME}"/winetricks ]; then
+        rm -rf "${XDG_CACHE_HOME}"/winetricks
+      fi
 
-			mkdir -p "${XDG_CACHE_HOME}"
-			mkdir -p winetricks_cache
-			ln -sr winetricks_cache "${XDG_CACHE_HOME}"/winetricks
-		fi
+      mkdir -p "${XDG_CACHE_HOME}"
+      mkdir -p winetricks_cache
+      ln -sr winetricks_cache "${XDG_CACHE_HOME}"/winetricks
+    fi
 
-		return 0
-	else
-		echo "winetricks is missing"
-		echo "Perhaps you have no internet connection"
-		return 1
-	fi
+    return 0
+  else
+    echo "winetricks is missing"
+    echo "Perhaps you have no internet connection"
+    return 1
+  fi
 }
-
-prefix_init_error() {
-		clear
-		echo "There is a problem initializing the Wine prefix!"
-		echo "Check ${TEMPFILES_DIR}/wineboot.log for more information."
-
-		rm -rf "${WINEPREFIX}"
-		exit 1
-}
-
-get_system_info() {
-	rm -f "${TEMPFILES_DIR}"/sysinfo
-
-	ldd --version &>>"${TEMPFILES_DIR}"/sysinfo
-	echo >>"${TEMPFILES_DIR}"/sysinfo
-
-	if command -v inxi 1>/dev/null; then
-		inxi -b &>>"${TEMPFILES_DIR}"/sysinfo
-		echo >>"${TEMPFILES_DIR}"/sysinfo
-	else
-		uname -a &>>"${TEMPFILES_DIR}"/sysinfo
-		echo >>"${TEMPFILES_DIR}"/sysinfo
-
-		if command -v lspci 1>/dev/null; then
-			lspci | grep VGA &>>"${TEMPFILES_DIR}"/sysinfo
-			echo >>"${TEMPFILES_DIR}"/sysinfo
-		fi
-
-		if [ -f /etc/os-release ]; then
-			cat /etc/os-release >>"${TEMPFILES_DIR}"/sysinfo
-			echo >>"${TEMPFILES_DIR}"/sysinfo
-		fi
-
-		if [ -f /etc/lsb-release ]; then
-			cat /etc/lsb-release >>"${TEMPFILES_DIR}"/sysinfo
-			echo >>"${TEMPFILES_DIR}"/sysinfo
-		fi
-	fi
-
-	if command -v glxinfo 1>/dev/null; then
-		glxinfo -B &>>"${TEMPFILES_DIR}"/sysinfo
-		echo >>"${TEMPFILES_DIR}"/sysinfo
-	fi
-
-	if command -v vulkaninfo 1>/dev/null; then
-		vulkaninfo --summary &>>"${TEMPFILES_DIR}"/sysinfo
-		echo >>"${TEMPFILES_DIR}"/sysinfo
-	fi
-}
-
-## Check the launch arguments
-
-if [ "$1" = "--clear" ]; then
-	rm -rf "${XDG_CACHE_HOME}"
-	rm -rf "${DOCUMENTS_DIR}"
-	rm -rf "${WINEPREFIX}"
-	rm -rf "${WINEPREFIX}"_old_*
-	rm -rf "${TEMPFILES_DIR}"
-
-	echo "Files have been removed!"
-	exit
-fi
-
-if [ "$1" = "--shortcuts" ]; then
-	if [ -f "${HOME}"/.config/user-dirs.dirs ]; then
-		source "${HOME}"/.config/user-dirs.dirs
-	fi
-
-	if [ -z "${XDG_DESKTOP_DIR}" ]; then
-		XDG_DESKTOP_DIR="${HOME}"/Desktop
-	fi
-
-	desktop_icon="${XDG_DESKTOP_DIR}"/"${GAME}".desktop
-	menu_icon="${HOME}"/.local/share/applications/"${GAME}".desktop
-
-	if [ -f "${desktop_icon}" ] || [ -f "${menu_icon}" ]; then
-		rm -f "${desktop_icon}"
-		rm -f "${menu_icon}"
-
-		echo "Shortcuts have been removed!"
-	else
-		cat <<EOF > game.desktop
-[Desktop Entry]
-Version=1.0
-Name=${GAME}
-Type=Application
-Terminal=false
-Exec="${scriptdir}/start.sh"
-Icon=${scriptdir}/game_info/icon
-EOF
-
-		mkdir -p "${XDG_DESKTOP_DIR}"
-		mkdir -p "${HOME}"/.local/share/applications
-
-		cp game.desktop "${desktop_icon}"
-		cp game.desktop "${menu_icon}"
-		rm -f game.desktop
-
-		echo "Shortcuts have been added!"
-	fi
-
-	exit
-fi
-
-WINE_VERSION="$("${WINE}" --version 2>/dev/null)"
-
-list_game_info_content
-
-## If the USER environment variable is empty (which is unlikely),
-## get the username using the id command
-
-if [ -z "${USER}" ]; then
-	USER="$(id -un)"
-fi
-
-## Create or recreate the prefix
-## WINEPREFIX will be automatically (re)created in these cases:
-##
-## If the WINEPREFIX directory doesn't exist
-## If the DOCUMENTS_DIR directory doesn't exist
-## If the content of the game_info directory has changed since the last launch
-## If the username has changed since the last launch
-## If the Wine version has changed since the last launch
-## If NTFS_MODE is enabled and the path to the script has changed since the last launch
 
 download_winetricks() {
     if command -v winetricks &>/dev/null; then
