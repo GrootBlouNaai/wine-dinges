@@ -608,412 +608,363 @@ fi
 ## If the Wine version has changed since the last launch
 ## If NTFS_MODE is enabled and the path to the script has changed since the last launch
 
-if [ ! -d "${WINEPREFIX}" ] || [ ! -d "${DOCUMENTS_DIR}" ] \
-	|| [ "${USER}" != "$(cat "${TEMPFILES_DIR}"/lastuser 2>/dev/null)" ] \
-	|| [ "${WINE_VERSION}" != "$(cat "${TEMPFILES_DIR}"/lastwine 2>/dev/null)" ] \
-	|| [ "${GAME_INFO_CONTENT}" != "$(cat "${TEMPFILES_DIR}"/last_game_info_files 2>/dev/null)" ] \
-	|| ( [ "${NTFS_MODE}" = 1 ] && [ "${scriptdir}" != "$(cat "${TEMPFILES_DIR}"/last_scriptdir 2>/dev/null)" ] ); then
+download_winetricks() {
+    if command -v winetricks &>/dev/null; then
+        return 0
+    else
+        echo "Downloading winetricks..."
+        wget -q -O winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks
+        chmod +x winetricks
+        mkdir -p "${XDG_CACHE_HOME}"
+        mkdir -p winetricks_cache
+        ln -sr winetricks_cache "${XDG_CACHE_HOME}"/winetricks
+        return 0
+    fi
+}
 
-	## Disable WINEESYNC and WINEFSYNC temporarily when creating prefix
+prefix_init_error() {
+    echo "There is a problem initializing the Wine prefix!"
+    echo "Check ${TEMPFILES_DIR}/wineboot.log for more information."
+    rm -rf "${WINEPREFIX}"
+    exit 1
+}
 
-	WINEESYNC_VALUE="${WINEESYNC}"
-	WINEFSYNC_VALUE="${WINEFSYNC}"
-	export WINEESYNC=0
-	export WINEFSYNC=0
+get_system_info() {
+    rm -f "${TEMPFILES_DIR}"/sysinfo
+    ldd --version &>>"${TEMPFILES_DIR}"/sysinfo
+    echo >>"${TEMPFILES_DIR}"/sysinfo
+    if command -v inxi &>/dev/null; then
+        inxi -b &>>"${TEMPFILES_DIR}"/sysinfo
+        echo >>"${TEMPFILES_DIR}"/sysinfo
+    else
+        uname -a &>>"${TEMPFILES_DIR}"/sysinfo
+        echo >>"${TEMPFILES_DIR}"/sysinfo
+        if command -v lspci &>/dev/null; then
+            lspci | grep VGA &>>"${TEMPFILES_DIR}"/sysinfo
+            echo >>"${TEMPFILES_DIR}"/sysinfo
+        fi
+        if [ -f /etc/os-release ]; then
+            cat /etc/os-release >>"${TEMPFILES_DIR}"/sysinfo
+            echo >>"${TEMPFILES_DIR}"/sysinfo
+        fi
+        if [ -f /etc/lsb-release ]; then
+            cat /etc/lsb-release >>"${TEMPFILES_DIR}"/sysinfo
+            echo >>"${TEMPFILES_DIR}"/sysinfo
+        fi
+    fi
+    if command -v glxinfo &>/dev/null; then
+        glxinfo -B &>>"${TEMPFILES_DIR}"/sysinfo
+        echo >>"${TEMPFILES_DIR}"/sysinfo
+    fi
+    if command -v vulkaninfo &>/dev/null; then
+        vulkaninfo --summary &>>"${TEMPFILES_DIR}"/sysinfo
+        echo >>"${TEMPFILES_DIR}"/sysinfo
+    fi
+}
 
-	mkdir -p "${TEMPFILES_DIR}"
+check_recreate_prefix() {
+    [ ! -d "${WINEPREFIX}" ] ||
+    [ ! -d "${DOCUMENTS_DIR}" ] ||
+    [ "${USER}" != "$(cat "${TEMPFILES_DIR}"/lastuser 2>/dev/null)" ] ||
+    [ "${WINE_VERSION}" != "$(cat "${TEMPFILES_DIR}"/lastwine 2>/dev/null)" ] ||
+    [ "${GAME_INFO_CONTENT}" != "$(cat "${TEMPFILES_DIR}"/last_game_info_files 2>/dev/null)" ] ||
+    ( [ "${NTFS_MODE}" = 1 ] && [ "${scriptdir}" != "$(cat "${TEMPFILES_DIR}"/last_scriptdir 2>/dev/null)" ] )
+}
 
-	if [ "${REMOVE_OLD_PREFIXES}" = 1 ]; then
-		rm -rf "${WINEPREFIX}"
-	else
-		mv "${WINEPREFIX}" "${WINEPREFIX}"_old_"$(date '+%d.%m_%H:%M:%S')" 2>/dev/null
-	fi
+recreate_prefix() {
+    WINEESYNC_VALUE="${WINEESYNC}"
+    WINEFSYNC_VALUE="${WINEFSYNC}"
+    export WINEESYNC=0
+    export WINEFSYNC=0
 
-	unset disable_wine_gst
-	if [ "${PREFIX_HANG_FIX}" = 1 ]; then
-		disable_wine_gst="winegstreamer,"
-	fi
+    mkdir -p "${TEMPFILES_DIR}"
 
-	echo "Creating prefix"
-	export WINEDEBUG="err+all,fixme+all"
-	export WINEDLLOVERRIDES_ORIG="${WINEDLLOVERRIDES}"
-	export WINEDLLOVERRIDES="${disable_wine_gst}mscoree,mshtml=;${WINEDLLOVERRIDES}"
+    if [ "${REMOVE_OLD_PREFIXES}" = 1 ]; then
+        rm -rf "${WINEPREFIX}"
+    else
+        mv "${WINEPREFIX}" "${WINEPREFIX}"_old_"$(date '+%d.%m_%H:%M:%S')" 2>/dev/null
+    fi
 
-	if ! "${WINE}" wineboot &>"${TEMPFILES_DIR}"/wineboot.log; then
-		if [ "${NTFS_MODE}" != 1 ] && \
-		   grep "$(df -P . | tail -1 | cut -d' ' -f 1)" /proc/mounts 2>/dev/null | grep -i -E 'ntfs|fat|fuseblk' &>/dev/null; then
-			rm -rf "${WINEPREFIX}"
-			ntfs_mode
+    unset disable_wine_gst
+    if [ "${PREFIX_HANG_FIX}" = 1 ]; then
+        disable_wine_gst="winegstreamer,"
+    fi
 
-			if ! "${WINE}" wineboot &>"${TEMPFILES_DIR}"/wineboot.log; then
-				prefix_init_error
-			else
-				echo > "${TEMPFILES_DIR}"/force_ntfs_mode
-			fi
-		else
-			prefix_init_error
-		fi
-	fi
+    echo "Creating prefix"
+    export WINEDEBUG="err+all,fixme+all"
+    export WINEDLLOVERRIDES_ORIG="${WINEDLLOVERRIDES}"
+    export WINEDLLOVERRIDES="${disable_wine_gst}mscoree,mshtml=;${WINEDLLOVERRIDES}"
 
-	export WINEDEBUG="-all"
-	export WINEDLLOVERRIDES="${WINEDLLOVERRIDES_ORIG}"
-	"${WINESERVER}" -w
+    if ! "${WINE}" wineboot &>"${TEMPFILES_DIR}"/wineboot.log; then
+        if [ "${NTFS_MODE}" != 1 ] && \
+           grep "$(df -P . | tail -1 | cut -d' ' -f 1)" /proc/mounts 2>/dev/null | grep -i -E 'ntfs|fat|fuseblk' &>/dev/null; then
+            rm -rf "${WINEPREFIX}"
+            ntfs_mode
 
-	## Create symlink to the game directory
+            if ! "${WINE}" wineboot &>"${TEMPFILES_DIR}"/wineboot.log; then
+                prefix_init_error
+            else
+                echo > "${TEMPFILES_DIR}"/force_ntfs_mode
+            fi
+        else
+            prefix_init_error
+        fi
+    fi
 
-	mkdir -p "${GAME_PATH}"
-	rm -rf "${GAME_PATH}"
-	ln -sr "${scriptdir}"/game_info/data "${GAME_PATH}"
+    export WINEDEBUG="-all"
+    export WINEDLLOVERRIDES="${WINEDLLOVERRIDES_ORIG}"
+    "${WINESERVER}" -w
 
-	## Valve's Proton always uses steamuser as a username
-	## Given this we can determine if Proton is being used instead of
-	## regular Wine
+    mkdir -p "${GAME_PATH}"
+    rm -rf "${GAME_PATH}"
+    ln -sr "${scriptdir}"/game_info/data "${GAME_PATH}"
 
-	if [ -d "${WINEPREFIX}"/drive_c/users/steamuser ]; then
-		USERNAME="steamuser"
-	else
-		USERNAME="${USER}"
-	fi
+    if [ -d "${WINEPREFIX}"/drive_c/users/steamuser ]; then
+        USERNAME="steamuser"
+    else
+        USERNAME="${USER}"
+    fi
 
-	## Sandbox the prefix; Partially borrowed from the winetricks script
-	## And move the user's directory outside the prefix
+    rm -f "${WINEPREFIX}"/dosdevices/*
+    ln -sr "${WINEPREFIX}"/drive_c "${WINEPREFIX}"/dosdevices/c:
+    ln -sr "${scriptdir}" "${WINEPREFIX}"/dosdevices/k:
 
-	rm -f "${WINEPREFIX}"/dosdevices/*
-	ln -sr "${WINEPREFIX}"/drive_c "${WINEPREFIX}"/dosdevices/c:
-	ln -sr "${scriptdir}" "${WINEPREFIX}"/dosdevices/k:
+    "${WINE}" regedit /D "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Desktop\\Namespace\\{9D20AAE8-0625-44B0-9CA7-71889C2254D9}" &>/dev/null
+    echo disable > "${WINEPREFIX}"/.update-timestamp
 
-	"${WINE}" regedit /D "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Desktop\\Namespace\\{9D20AAE8-0625-44B0-9CA7-71889C2254D9}" &>/dev/null
-	echo disable > "${WINEPREFIX}"/.update-timestamp
+    if [ ! -d "${DOCUMENTS_DIR}" ]; then
+        if cd "${WINEPREFIX}"/drive_c/users/"${USERNAME}"; then
+            mkdir -p Documents_Multilocale
+            for x in *; do
+                if test -h "${x}" && test -d "${x}"; then
+                    rm -f "${x}"
+                    ln -sr Documents_Multilocale "${x}"
+                fi
+            done
+        fi
+        cd "${scriptdir}"
 
-	if [ ! -d "${DOCUMENTS_DIR}" ]; then
-		if cd "${WINEPREFIX}"/drive_c/users/"${USERNAME}"; then
-			## Use one directory (Documents_Multilocale) for all symlinks
-			## This is necessary for multilocale compatibility
+        mv "${WINEPREFIX}"/drive_c/users/"${USERNAME}" "${DOCUMENTS_DIR}"
+        mv "${WINEPREFIX}"/drive_c/users/Public "${DOCUMENTS_DIR}"/Public
+        mv "${WINEPREFIX}"/drive_c/ProgramData "${DOCUMENTS_DIR}"/ProgramData
+    fi
 
-			mkdir -p Documents_Multilocale
+    rm -rf "${WINEPREFIX}"/drive_c/users/"${USERNAME}"
+    rm -rf "${WINEPREFIX}"/drive_c/users/Public
+    rm -rf "${WINEPREFIX}"/drive_c/ProgramData
+    ln -sr "${DOCUMENTS_DIR}" "${WINEPREFIX}"/drive_c/users/"${USERNAME}"
+    ln -sr "${DOCUMENTS_DIR}"/Public "${WINEPREFIX}"/drive_c/users/Public
+    ln -sr "${DOCUMENTS_DIR}"/ProgramData "${WINEPREFIX}"/drive_c/ProgramData
 
-			for x in *; do
-				if test -h "${x}" && test -d "${x}"; then
-					rm -f "${x}"
-					ln -sr Documents_Multilocale "${x}"
-				fi
-			done
-		fi
-		cd "${scriptdir}"
+    "${WINE}" reg add 'HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders' \
+    /v "Personal" /t REG_EXPAND_SZ /d "%USERPROFILE%\Documents_Multilocale" /f &>/dev/null
 
-		mv "${WINEPREFIX}"/drive_c/users/"${USERNAME}" "${DOCUMENTS_DIR}"
-		mv "${WINEPREFIX}"/drive_c/users/Public "${DOCUMENTS_DIR}"/Public
-		mv "${WINEPREFIX}"/drive_c/ProgramData "${DOCUMENTS_DIR}"/ProgramData
-	fi
+    if [ -f game_info/winetricks_list.txt ]; then
+        if download_winetricks; then
+            echo "Executing winetricks"
+            "${scriptdir}"/winetricks -q $(cat game_info/winetricks_list.txt) &>/dev/null
+            "${WINESERVER}" -w
+        else
+            rm -rf "${WINEPREFIX}"
+            exit 1
+        fi
+    fi
 
-	rm -rf "${WINEPREFIX}"/drive_c/users/"${USERNAME}"
-	rm -rf "${WINEPREFIX}"/drive_c/users/Public
-	rm -rf "${WINEPREFIX}"/drive_c/ProgramData
-	ln -sr "${DOCUMENTS_DIR}" "${WINEPREFIX}"/drive_c/users/"${USERNAME}"
-	ln -sr "${DOCUMENTS_DIR}"/Public "${WINEPREFIX}"/drive_c/users/Public
-	ln -sr "${DOCUMENTS_DIR}"/ProgramData "${WINEPREFIX}"/drive_c/ProgramData
+    if [ -d game_info/exe ]; then
+        echo "Executing files"
+        for file in game_info/exe/*; do
+            "${WINE}" start "${file}" &>/dev/null
+            "${WINESERVER}" -w
+            sleep 0.1
+        done
+    fi
 
-	## Change My Documents directory to Documents_Multilocale via registry
-	## This is mostly useful for Proton as it doesn't create symlinks
-	## in the user's directory in Wine prefix, so we can't just redirect symlinks.
+    if [ -d game_info/regs ]; then
+        echo "Importing registry files"
+        for file in game_info/regs/*; do
+            "${WINE}" regedit "${file}" &>/dev/null
+            "${WINE64}" regedit "${file}" &>/dev/null
+        done
+    fi
 
-	"${WINE}" reg add 'HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders' \
-	/v "Personal" /t REG_EXPAND_SZ /d "%USERPROFILE%\Documents_Multilocale" /f &>/dev/null
+    if [ -d game_info/dlls ]; then
+        echo "Overriding dlls"
+        for x in game_info/dlls/*; do
+            if [ -d "${x}" ]; then
+                for i in "${x}"/*; do
+                    dll_name="$(basename "${i}")"
+                    dir_name="$(basename "${x}")"
+                    rm -f "${WINEPREFIX}"/drive_c/windows/"${dir_name}"/"${dll_name}"
+                    ln -sr "${scriptdir}"/"${i}" "${WINEPREFIX}"/drive_c/windows/"${dir_name}"
+                    if [[ ! "${dlls_list}" == *"${dll_name}"* ]]; then
+                        dlls_list="${dll_name} ${dlls_list}"
+                    fi
+                done
+            else
+                dll_name="$(basename "${x}")"
+                rm -f "${WINEPREFIX}"/drive_c/windows/system32/"${dll_name}"
+                ln -sr "${scriptdir}"/"${x}" "${WINEPREFIX}"/drive_c/windows/system32
+                dlls_list="${dll_name} ${dlls_list}"
+            fi
+        done
+        for x in ${dlls_list}; do
+            "${WINE}" reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v \
+            "$(basename "${x}" .dll)" /d native /f &>/dev/null
+            "${WINE}" regsvr32 /s "${x}" &>/dev/null
+            "${WINE64}" regsvr32 /s "${x}" &>/dev/null
+        done
+    fi
 
-	## Execute winetricks actions from the winetricks_list.txt file
+    if [ -d game_info/additional ]; then
+        echo "Copying additional files"
+        if [ -d game_info/additional/prefix ]; then
+            cp -r game_info/additional/prefix/* "${WINEPREFIX}"
+        fi
+        if [ -d game_info/additional/documents ]; then
+            cp -r game_info/additional/documents/* "${DOCUMENTS_DIR}"
+        fi
+    fi
 
-	if [ -f game_info/winetricks_list.txt ]; then
-		if download_winetricks; then
-			echo "Executing winetricks"
+    if [ -n "${WINDOWS_VERSION}" ] && [ "${WINDOWS_VERSION}" != "default" ]; then
+        if [ "${WINDOWS_VERSION}" = "winxp" ]; then
+            "${WINE}" winecfg /v winxp &>/dev/null
+            "${WINE}" winecfg /v winxp64 &>/dev/null
+        else
+            "${WINE}" winecfg /v "${WINDOWS_VERSION}" &>/dev/null
+        fi
+    fi
 
-			"${scriptdir}"/winetricks -q $(cat game_info/winetricks_list.txt) &>/dev/null
-			"${WINESERVER}" -w
-		else
-			rm -rf "${WINEPREFIX}"
-			exit 1
-		fi
-	fi
+    export ENABLE_DEBUG=1
+    "${WINESERVER}" -w
+    sleep 2
 
-	## Execute files in the game_info/exe directory using Wine
+    get_system_info
+    echo "${USER}" > "${TEMPFILES_DIR}"/lastuser
+    echo "${WINE_VERSION}" > "${TEMPFILES_DIR}"/lastwine
+    echo "${GAME_INFO_CONTENT}" > "${TEMPFILES_DIR}"/last_game_info_files
+    echo "${scriptdir}" > "${TEMPFILES_DIR}"/last_scriptdir
 
-	if [ -d game_info/exe ]; then
-		echo "Executing files"
+    export WINEESYNC="${WINEESYNC_VALUE}"
+    export WINEFSYNC="${WINEFSYNC_VALUE}"
+}
 
-		for file in game_info/exe/*; do
-			"${WINE}" start "${file}" &>/dev/null
-			"${WINESERVER}" -w
-			sleep 0.1
-		done
-	fi
-
-	## Import reg files
-
-	if [ -d game_info/regs ]; then
-		echo "Importing registry files"
-
-		for file in game_info/regs/*; do
-			"${WINE}" regedit "${file}" &>/dev/null
-			"${WINE64}" regedit "${file}" &>/dev/null
-		done
-	fi
-
-	## Override dlls
-
-	if [ -d game_info/dlls ]; then
-		echo "Overriding dlls"
-
-		for x in game_info/dlls/*; do
-			if [ -d "${x}" ]; then
-				for i in "${x}"/*; do
-					dll_name="$(basename "${i}")"
-					dir_name="$(basename "${x}")"
-					rm -f "${WINEPREFIX}"/drive_c/windows/"${dir_name}"/"${dll_name}"
-					ln -sr "${scriptdir}"/"${i}" "${WINEPREFIX}"/drive_c/windows/"${dir_name}"
-
-					if [[ ! "${dlls_list}" == *"${dll_name}"* ]]; then
-						dlls_list="${dll_name} ${dlls_list}"
-					fi
-				done
-			else
-				dll_name="$(basename "${x}")"
-				rm -f "${WINEPREFIX}"/drive_c/windows/system32/"${dll_name}"
-				ln -sr "${scriptdir}"/"${x}" "${WINEPREFIX}"/drive_c/windows/system32
-				dlls_list="${dll_name} ${dlls_list}"
-			fi
-		done
-
-		for x in ${dlls_list}; do
-			"${WINE}" reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v \
-			"$(basename "${x}" .dll)" /d native /f &>/dev/null
-
-			"${WINE}" regsvr32 /s "${x}" &>/dev/null
-			"${WINE64}" regsvr32 /s "${x}" &>/dev/null
-		done
-	fi
-
-	## Copy the content of the additional directory
-
-	if [ -d game_info/additional ]; then
-		echo "Copying additional files"
-
-		if [ -d game_info/additional/prefix ]; then
-			cp -r game_info/additional/prefix/* "${WINEPREFIX}"
-		fi
-
-		if [ -d game_info/additional/documents ]; then
-			cp -r game_info/additional/documents/* "${DOCUMENTS_DIR}"
-		fi
-	fi
-
-	## Set Windows version
-
-	if [ -n "${WINDOWS_VERSION}" ] && [ "${WINDOWS_VERSION}" != "default" ]; then
-		if [ "${WINDOWS_VERSION}" = "winxp" ]; then
-			"${WINE}" winecfg /v winxp &>/dev/null
-			"${WINE}" winecfg /v winxp64 &>/dev/null
-		else
-			"${WINE}" winecfg /v "${WINDOWS_VERSION}" &>/dev/null
-		fi
-	fi
-
-	## Enable debug during the first run
-
-	export ENABLE_DEBUG=1
-
-	## Wait for all Wine processes to terminate
-
-	"${WINESERVER}" -w
-	sleep 2
-
-	## Save the information about the system, the username, the Wine version and
-	## the list of files of the game_info directory
-	## This is needed to know when to recreate the prefix
-
-	get_system_info
-	echo "${USER}" > "${TEMPFILES_DIR}"/lastuser
-	echo "${WINE_VERSION}" > "${TEMPFILES_DIR}"/lastwine
-	echo "${GAME_INFO_CONTENT}" > "${TEMPFILES_DIR}"/last_game_info_files
-	echo "${scriptdir}" > "${TEMPFILES_DIR}"/last_scriptdir
-
-	export WINEESYNC="${WINEESYNC_VALUE}"
-	export WINEFSYNC="${WINEFSYNC_VALUE}"
+# Main script execution
+if check_recreate_prefix; then
+    recreate_prefix
 fi
-
-## Remove Z: drive in case Wine added it again
 
 rm -f "${WINEPREFIX}"/dosdevices/z:
 
-## Check the launch arguments
-
-if [ "$1" = "--cfg" ]; then
-	"${WINE}" winecfg
-	exit
-elif [ "$1" = "--reg" ]; then
-	"${WINE}" regedit
-	exit
-elif [ "$1" = "--fm" ]; then
-	"${WINE}" winefile
-	exit
-elif [ "$1" = "--kill" ]; then
-	"${WINESERVER}" -k
-
-	echo "All processes in the prefix have been killed!"
-	exit
-elif [ "$1" = "--tricks" ]; then
-	if download_winetricks; then
-		shift
-		"${scriptdir}"/winetricks "$@"
-		"${WINESERVER}" -w
-	fi
-
-	exit
-elif [ "$1" = "--debug" ]; then
-	export ENABLE_DEBUG=1
-	shift
-fi
+case "$1" in
+    --cfg)
+        "${WINE}" winecfg
+        exit
+        ;;
+    --reg)
+        "${WINE}" regedit
+        exit
+        ;;
+    --fm)
+        "${WINE}" winefile
+        exit
+        ;;
+    --kill)
+        "${WINESERVER}" -k
+        echo "All processes in the prefix have been killed!"
+        exit
+        ;;
+    --tricks)
+        if download_winetricks; then
+            shift
+            "${scriptdir}"/winetricks "$@"
+            "${WINESERVER}" -w
+        fi
+        exit
+        ;;
+    --debug)
+        export ENABLE_DEBUG=1
+        shift
+        ;;
+esac
 
 if [ "${ENABLE_RT_DLSS}" = 1 ]; then
-	if [ ! -f "${WINEPREFIX}"/drive_c/windows/system32/nvngx.dll ]; then
-		nvngx_paths="/usr/lib/x86_64-linux-gnu/nvidia/current/nvidia/wine \
-		             /usr/lib64/nvidia/wine \
-		             /lib64/nvidia/wine \
-		             /usr/lib/nvidia/wine"
+    if [ ! -f "${WINEPREFIX}"/drive_c/windows/system32/nvngx.dll ]; then
+        nvngx_paths="/usr/lib/x86_64-linux-gnu/nvidia/current/nvidia/wine \
+                     /usr/lib64/nvidia/wine \
+                     /lib64/nvidia/wine \
+                     /usr/lib/nvidia/wine"
 
-		for d in ${nvngx_paths}; do
-			if [ -f "${d}"/nvngx.dll ]; then
-				cp "${d}"/nvngx.dll "${WINEPREFIX}"/drive_c/windows/system32
-				cp "${d}"/_nvngx.dll "${WINEPREFIX}"/drive_c/windows/system32
-				break
-			fi
-		done
-	fi
+        for d in ${nvngx_paths}; do
+            if [ -f "${d}"/nvngx.dll ]; then
+                cp "${d}"/nvngx.dll "${WINEPREFIX}"/drive_c/windows/system32
+                cp "${d}"/_nvngx.dll "${WINEPREFIX}"/drive_c/windows/system32
+                break
+            fi
+        done
+    fi
 
-	if [ -f "${WINEPREFIX}"/drive_c/windows/system32/nvngx.dll ] && \
-	   ( [ -f game_info/dlls/nvapi64.dll ] || [ -f game_info/dlls/system32/nvapi64.dll ] ); then
-		rm -f "${TEMPFILES_DIR}"/dlss_disabled
-		export WINEDLLOVERRIDES="nvapi,nvapi64=n;${WINEDLLOVERRIDES}"
-		export VKD3D_CONFIG=dxr
-		export VKD3D_FEATURE_LEVEL=12_2
-		export DXVK_ENABLE_NVAPI=1
-		export WINE_HIDE_NVIDIA_GPU=0
-	else
-		echo > "${TEMPFILES_DIR}"/dlss_disabled
-		export ENABLE_RT_DLSS=0
-	fi
+    if [ -f "${WINEPREFIX}"/drive_c/windows/system32/nvngx.dll ] && \
+       ( [ -f game_info/dlls/nvapi64.dll ] || [ -f game_info/dlls/system32/nvapi64.dll ] ); then
+        rm -f "${TEMPFILES_DIR}"/dlss_disabled
+        export WINEDLLOVERRIDES="nvapi,nvapi64=n;${WINEDLLOVERRIDES}"
+        export VKD3D_CONFIG=dxr
+        export VKD3D_FEATURE_LEVEL=12_2
+        export DXVK_ENABLE_NVAPI=1
+        export WINE_HIDE_NVIDIA_GPU=0
+    else
+        echo > "${TEMPFILES_DIR}"/dlss_disabled
+        export ENABLE_RT_DLSS=0
+    fi
 fi
 
 if [ "${ENABLE_RT_DLSS}" = 0 ]; then
-	export WINEDLLOVERRIDES="nvapi,nvapi64=;${WINEDLLOVERRIDES}"
+    export WINEDLLOVERRIDES="nvapi,nvapi64=;${WINEDLLOVERRIDES}"
 fi
-
-## Disable DXVK if the appropriate variable is enabled
 
 if [ "${DISABLE_DXVK}" = 1 ]; then
-	export WINEDLLOVERRIDES="dxgi,d3d8,d3d9,d3d10,d3d10_1,d3d10core,d3d11=b;${WINEDLLOVERRIDES}"
+    export WINEDLLOVERRIDES="dxgi,d3d8,d3d9,d3d10,d3d10_1,d3d10core,d3d11=b;${WINEDLLOVERRIDES}"
 fi
-
-## Use builtin VKD3D instead of external VKD3D-proton if the appropriate
-## variable is enabled
 
 if [ "${USE_BUILTIN_VKD3D}" = 1 ]; then
-	export WINEDLLOVERRIDES="dxgi,d3d12,d3d12core=b;${WINEDLLOVERRIDES}"
+    export WINEDLLOVERRIDES="dxgi,d3d12,d3d12core=b;${WINEDLLOVERRIDES}"
 fi
-
-## Enable virtual desktop if the appropriate variable is enabled
 
 if [ "${VIRTUAL_DESKTOP}" = 1 ]; then
-	VDESKTOP="explorer /desktop=Wine,${VIRTUAL_DESKTOP_SIZE}"
+    VDESKTOP="explorer /desktop=Wine,${VIRTUAL_DESKTOP_SIZE}"
 fi
-
-if [ -f "${TEMPFILES_DIR}"/enable_debug ]; then
-	rm -f "${TEMPFILES_DIR}"/enable_debug
-	ENABLE_DEBUG=1
-fi
-
-## Enable debug if the appropriate variable is enabled
-
-if [ "${ENABLE_DEBUG}" = 1 ]; then
-	export WINEDEBUG="err+all,fixme+all"
-	unset DXVK_LOG_LEVEL
-	unset VKD3D_DEBUG
-	unset VKD3D_SHADER_DEBUG
-
-	if command -v lscpu 1>/dev/null && \
-	   command -v grep 1>/dev/null && \
-	   command -v awk 1>/dev/null && \
-	   command -v glxinfo 1>/dev/null; then
-		CPU_MODEL=$(LC_ALL=C lscpu | grep "Model name:" | sed -r 's/Model name:\s{1,}//g')
-		RAM_TOTAL=$(awk '/MemTotal/ { printf "%.3f \n", $2/1000/1024 }' /proc/meminfo)
-		GLIBC_VERSION=$(LC_ALL=C ldd --version | awk '/ldd/{print $NF}')
-		LIBVULKAN1_VERSION=$((ldconfig -v | grep libvulkan | grep -s -Po '\.so\.\K([0-9]+\.)*[0-9]+' | sed '/^1./!d' ) 2>/dev/null | sed '$ d')
-		KERNEL_VERSION=$(uname -mr)
-
-		NVIDIA_DRIVER_VERSION=$(cat /sys/module/nvidia/version 2>/dev/null)
-		if [ -n "${NVIDIA_DRIVER_VERSION}" ]; then
-			GPU_MODEL=$(LC_ALL=C glxinfo | grep "OpenGL renderer string" | tail -c +25)
-			GPU_DRIVER_VERSION="${NVIDIA_DRIVER_VERSION}"
-		else
-			GPU_MODEL=$(LC_ALL=C glxinfo | grep Device | tail -c +13)
-			GPU_DRIVER_VERSION=$(LC_ALL=C glxinfo -B | grep "OpenGL version string" | grep "Mesa" | sed 's/^.*Mesa/Mesa/')
-		fi
-	fi
-fi
-
-## Get screen resolution if the appropriate variable is enabled
-
-if [ "${RESTORE_RESOLUTION}" = 1 ]; then
-	## If there are multiple monitors connected, get resolution of primary monitor
-
-	SCREEN_RESOLUTION="$(xrandr -q | sed -n -e 's/.* connected primary \([^ +]*\).*/\1/p')"
-	SCREEN_OUTPUT="$(xrandr -q | sed -n -e 's/\([^ ]*\) connected primary.*/\1/p')"
-
-	## If there is only one monitor, then xrandr doesn't mark it as "primary"
-	## So it's necessary to handle its output slightly differently
-
-    if [ -z "${SCREEN_RESOLUTION}" ] || [ -z "${SCREEN_OUTPUT}" ]; then
-		SCREEN_RESOLUTION="$(xrandr -q | sed -n -e 's/.* connected \([^ +]*\).*/\1/p')"
-		SCREEN_OUTPUT="$(xrandr -q | sed -n -e 's/\([^ ]*\) connected.*/\1/p')"
-	fi
-fi
-
-## Unset SDL_AUDIODRIVER and SDL_VIDEODRIVER, because they cause issues
-## for Windows games when set to a driver not available on Windows
-## (alsa, pulse, x11, wayland)
 
 unset SDL_AUDIODRIVER SDL_VIDEODRIVER
 
-check_dxvk () {
-	dlls_dirs="game_info/dlls game_info/dlls/system32 game_info/dlls/syswow64"
-	dlls_names="d3d8.dll d3d9.dll d3d11.dll"
+check_dxvk() {
+    dlls_dirs="game_info/dlls game_info/dlls/system32 game_info/dlls/syswow64"
+    dlls_names="d3d8.dll d3d9.dll d3d11.dll"
 
-	for d in ${dlls_dirs}; do
-		if [ -d "${d}" ]; then
-			for i in ${dlls_names}; do
-				if [ -f "${d}"/"${i}" ]; then
-					return 0
-				fi
-			done
-		fi
-	done
+    for d in ${dlls_dirs}; do
+        if [ -d "${d}" ]; then
+            for i in ${dlls_names}; do
+                if [ -f "${d}"/"${i}" ]; then
+                    return 0
+                fi
+            done
+        fi
+    done
 
-	return 1
+    return 1
 }
 
-check_vkd3d () {
-	dlls_dirs="game_info/dlls game_info/dlls/system32 game_info/dlls/syswow64"
-	dlls_names="d3d12.dll d3d12core.dll"
-
-	for d in ${dlls_dirs}; do
-		if [ -d "${d}" ]; then
-			for i in ${dlls_names}; do
-				if [ -f "${d}"/"${i}" ]; then
-					return 0
-				fi
-			done
-		fi
-	done
-
-	return 1
+check_vkd3d() {
+    dlls_dirs="game_info/dlls game_info/dlls/system32 game_info/dlls/syswow64"
+        dlls_names="d3d12.dll d3d12core.dll"
+    for d in ${dlls_dirs}; do
+        if [ -d "${d}" ]; then
+            for i in ${dlls_names}; do
+                if [ -f "${d}"/"${i}" ]; then
+                    return 0
+                fi
+            done
+        fi
+    done
+    return 1
 }
 
 # Show some info
