@@ -1,25 +1,5 @@
 #!/usr/bin/env bash
 
-########################################################################
-##
-## Project name: Wine launch wrapper
-## Version: 1.3.13
-## Author: Kron4ek
-## Contact emails: kron4ek@protonmail.com, kron4ek@gmail.com
-## My GitHub profile: https://github.com/Kron4ek
-##
-## Links to the latest version and documentation:
-##
-## Google Drive: https://drive.google.com/open?id=1fTfJQhQSzlEkY-j3g0H6p4lwmQayUNSR
-## MEGA: https://mega.nz/folder/oY01CKzD#5VaFPNvaUDT0j39FUqwrdQ
-##
-## This is a script for creating and running portable Wine applications.
-## It should work on all Linux distributions that have the bash shell and
-## the standard GNU utilities. And wget is (optionally) needed for the
-## script to be able to download winetricks.
-##
-########################################################################
-
 ## Exit if the script is running with root rights
 ## If you really need this for some reason and you absolutely know what you
 ## are doing, then just remove this if block
@@ -1036,8 +1016,7 @@ check_vkd3d () {
 	return 1
 }
 
-## Show some info
-
+# Show some info
 clear
 echo "========================================================================"
 echo "Game: ${GAME}"
@@ -1045,73 +1024,70 @@ echo "Version: ${VERSION}"
 echo -n "Wine: ${WINE_VERSION}"
 
 if [ "${USE_SYSTEM_WINE}" = 1 ]; then
-	echo -n " (using system Wine)"
+    echo -n " (using system Wine)"
 fi
 echo
 
 if [ -n "${ARGS}" ] || [ -n "$1" ]; then
-	echo "Launch arguments: $@ ${ARGS}"
+    echo "Launch arguments: $@ ${ARGS}"
 fi
 
 if check_dxvk; then
-	if [ "${DISABLE_DXVK}" != 1 ]; then
-		echo "DXVK: enabled"
-	else
-		echo "DXVK: disabled"
-	fi
+    if [ "${DISABLE_DXVK}" != 1 ]; then
+        echo "DXVK: enabled"
+    else
+        echo "DXVK: disabled"
+    fi
 fi
 
 if check_vkd3d; then
-	if [ "${USE_BUILTIN_VKD3D}" != 1 ]; then
-		echo "VKD3D: external (vkd3d-proton)"
-	else
-		echo "VKD3D: builtin"
-	fi
+    if [ "${USE_BUILTIN_VKD3D}" != 1 ]; then
+        echo "VKD3D: external (vkd3d-proton)"
+    else
+        echo "VKD3D: builtin"
+    fi
 fi
 
 if [ "${ENABLE_RT_DLSS}" = 1 ]; then
-	echo "DLSS and RT support enabled"
+    echo "DLSS and RT support enabled"
 fi
 
 if [ "${NTFS_MODE}" = 1 ]; then
-	echo "NTFS mode is enabled"
+    echo "NTFS mode is enabled"
 fi
 
 if [ -n "${DISABLE_DLLS}" ]; then
-	echo "Disabled DLLs: ${DISABLE_DLLS}"
+    echo "Disabled DLLs: ${DISABLE_DLLS}"
 fi
 
 if [ "${ENABLE_DEBUG}" = 1 ]; then
-	echo
-	echo "CPU model: ${CPU_MODEL}"
-	echo "GPU model: ${GPU_MODEL}"
-	echo "Videodriver version: ${GPU_DRIVER_VERSION}"
-	echo "RAM amount: ${RAM_TOTAL}"
-	echo "GLIBC version: ${GLIBC_VERSION}"
-	echo "Vulkan-Loader version: ${LIBVULKAN1_VERSION}"
-	echo "Kernel version: ${KERNEL_VERSION}"
+    echo
+    echo "CPU model: ${CPU_MODEL}"
+    echo "GPU model: ${GPU_MODEL}"
+    echo "Videodriver version: ${GPU_DRIVER_VERSION}"
+    echo "RAM amount: ${RAM_TOTAL}"
+    echo "GLIBC version: ${GLIBC_VERSION}"
+    echo "Vulkan-Loader version: ${LIBVULKAN1_VERSION}"
+    echo "Kernel version: ${KERNEL_VERSION}"
 fi
 
 echo "========================================================================"
 echo
 
-## Launch the game
-
+# Launch the game
 cd "${scriptdir}"/game_info/data/"${ADDITIONAL_PATH}" || exit 1
 
 "${WINE}" ${VDESKTOP} start "${EXE}" ${ARGS} "$@"
 
-## If the game or Wine fails, enable debug for the next launch
-
+# If the game or Wine fails, enable debug for the next launch
 if [ $? -ne 0 ]; then
     echo > "${TEMPFILES_DIR}"/enable_debug
 fi
 
 "${WINESERVER}" -w
 
-## Restore screen resolution
-
+# Restore screen resolution
 if [ "${RESTORE_RESOLUTION}" = 1 ]; then
-	xrandr --output "${SCREEN_OUTPUT}" --mode "${SCREEN_RESOLUTION}" &>/dev/null
-	xgamma -gamma 1.0 &>/dev/null
+    xrandr --output "${SCREEN_OUTPUT}" --mode "${SCREEN_RESOLUTION}" &>/dev/null
+    xgamma -gamma 1.0 &>/dev/null
 fi
