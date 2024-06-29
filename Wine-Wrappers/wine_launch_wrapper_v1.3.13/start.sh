@@ -1,39 +1,34 @@
 #!/usr/bin/env bash
 
-## Exit if the script is running with root rights
-## If you really need this for some reason and you absolutely know what you
-## are doing, then just remove this if block
-
+# Exit if the script is running with root rights
 if [ "$EUID" = 0 ]; then
   echo "Please do not run this script as root!"
   exit 1
 fi
 
-## Show available arguments
-
+# Show available arguments
 if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
-	clear
-	echo -e "Available arguments:\n"
-	echo -e "--cfg\t\t\t\tRun winecfg"
-	echo -e "--reg\t\t\t\tRun regedit"
-	echo -e "--fm\t\t\t\tRun Wine file manager"
-	echo -e "--kill\t\t\t\tKill all processes running in the prefix"
-	echo -e "--tricks\t\t\tRun winetricks with the specified arguments"
-	echo -e "\t\t\t\t(for example, ./start.sh --tricks vcrun2015)"
-	echo -e "--debug\t\t\t\tShow more information when running Wine"
-	echo -e "--shortcuts\t\t\tAdd shortcuts to launch the script on"
-	echo -e "\t\t\t\tthe desktop and the applications menu"
-	echo -e "\t\t\t\tIf the shortcuts already exist, they will be"
-	echo -e "\t\t\t\tremoved."
-	echo -e "--clear\t\t\t\tRemove all files and directories"
-	echo -e "\t\t\t\t(except the settings_* and winetricks)"
-	echo -e "\t\t\t\tcreated by the script."
-	echo -e "\t\t\t\tThis will likely remove all game settings and"
-	echo -e "\t\t\t\tsaves. Use with caution!"
-	echo -e "\nAll other arguments that don't match any of the above"
-	echo "will be passed to the game itself."
-
-	exit
+  clear
+  echo -e "Available arguments:\n"
+  echo -e "--cfg\t\t\t\tRun winecfg"
+  echo -e "--reg\t\t\t\tRun regedit"
+  echo -e "--fm\t\t\t\tRun Wine file manager"
+  echo -e "--kill\t\t\t\tKill all processes running in the prefix"
+  echo -e "--tricks\t\t\tRun winetricks with the specified arguments"
+  echo -e "\t\t\t\t(for example, ./start.sh --tricks vcrun2015)"
+  echo -e "--debug\t\t\t\tShow more information when running Wine"
+  echo -e "--shortcuts\t\t\tAdd shortcuts to launch the script on"
+  echo -e "\t\t\t\tthe desktop and the applications menu"
+  echo -e "\t\t\t\tIf the shortcuts already exist, they will be"
+  echo -e "\t\t\t\tremoved."
+  echo -e "--clear\t\t\t\tRemove all files and directories"
+  echo -e "\t\t\t\t(except the settings_* and winetricks)"
+  echo -e "\t\t\t\tcreated by the script."
+  echo -e "\t\t\t\tThis will likely remove all game settings and"
+  echo -e "\t\t\t\tsaves. Use with caution!"
+  echo -e "\nAll other arguments that don't match any of the above"
+  echo "will be passed to the game itself."
+  exit
 fi
 
 export script="$(readlink -f "${BASH_SOURCE[0]}")"
@@ -41,93 +36,52 @@ export scriptdir="$(dirname "$script")"
 
 cd "${scriptdir}" || exit 1
 
-## Set path to Wine binaries
-
-export WINE="${scriptdir}"/wine/bin/wine
-export WINE64="${scriptdir}"/wine/bin/wine64
-export WINESERVER="${scriptdir}"/wine/bin/wineserver
+# Set path to Wine binaries
+export WINE="${scriptdir}/wine/bin/wine"
+export WINE64="${scriptdir}/wine/bin/wine64"
+export WINESERVER="${scriptdir}/wine/bin/wineserver"
 export USE_SYSTEM_WINE=0
 
-## Set path to Wine prefix
+# Set path to Wine prefix
+export WINEPREFIX="${scriptdir}/prefix"
 
-export WINEPREFIX="${scriptdir}"/prefix
-
-## By default, when the script recreates the prefix, it renames the old
-## prefix to WINEPREFIX_old_DATE. This is useful because the old prefix may
-## contain important information that you might want to move to the new
-## prefix manually.
-##
-## Enable this variable to just remove old prefixes instead of
-## renaming them.
-
+# By default, when the script recreates the prefix, it renames the old
+# prefix to WINEPREFIX_old_DATE. This is useful because the old prefix may
+# contain important information that you might want to move to the new
+# prefix manually.
 export REMOVE_OLD_PREFIXES=0
 
-## Set the path to the documents directory
-## This directory will be used to store games saves and settings
-## Except when the game stores its saves in its own directory
+# Set the path to the documents directory
+export DOCUMENTS_DIR="${scriptdir}/documents"
 
-export DOCUMENTS_DIR="${scriptdir}"/documents
+# Set the path to the directory with temporary files used by the script
+export TEMPFILES_DIR="${scriptdir}/temp_files"
 
-## Set the path to the directory with temporary files used by the script
-
-export TEMPFILES_DIR="${scriptdir}"/temp_files
-
-## Set prefix architecture
-## win64 for 64-bit apps, win32 for 32-bit apps
-## Even though win64 can run 32-bit apps too, the script expects that
-## you will use win32 for 32-bit apps
-
+# Set prefix architecture
 export WINEARCH=win64
 
-## Disable Wine debug
-
+# Disable Wine debug
 export WINEDEBUG="-all"
 
-## Set Windows version
-## Available values: winxp, win7, win8, win10, default.
-## This only has effect during the prefix (re)creation
-
+# Set Windows version
 export WINDOWS_VERSION=default
 
-## Enable this only if Wine hangs when creating prefix
-## You need to remove the prefix directory after enabling this
-## Workaround for the bug: https://bugs.winehq.org/show_bug.cgi?id=51086
-
+# Enable this only if Wine hangs when creating prefix
 export PREFIX_HANG_FIX=0
 
-## Enable ESYNC/FSYNC
-## It's safe to enable both of them simultaneously
-## Wine will prefer FSYNC if it's supported by kernel, otherwise it will
-## use ESYNC
-##
-## FUTEX2 depends on FSYNC. If you disable FSYNC, then FUTEX2 won't work too
-## FUTEX2 may cause issues in some games
-
+# Enable ESYNC/FSYNC
 export WINEESYNC=1
 export WINEFSYNC=1
 export WINEFSYNC_FUTEX2=0
 
-#export WINE_SIMULATE_ASYNC_READ=1
-#export WINE_FSYNC_SIMULATE_SCHED_QUANTUM=1
-#export WINE_ALERT_SIMULATE_SCHED_QUANTUM=1
-#export WINE_FSYNC_YIELD_TO_WAITERS=1
-#export WINE_SIMULATE_WRITECOPY=1
-#export WINE_KERNEL_STACK_SIZE=64
-#export WINE_DISABLE_KERNEL_WRITEWATCH=1
-
-## Limit the amount of CPU cores for Wine applications
-## Some games do not work when there are many CPU threads
-
+# Limit the amount of CPU cores for Wine applications
 #export WINE_CPU_TOPOLOGY=12:0,1,2,3,4,5,6,7,8,9,10,11
 #export WINE_LOGICAL_CPUS_AS_CORES=1
 
-## Enable LARGE_ADDRESS_AWARE
-## Useful for 32-bit games hitting address space limitations
-
+# Enable LARGE_ADDRESS_AWARE
 export WINE_LARGE_ADDRESS_AWARE=1
 
-## FShack and FSR (AMD FidelityFX Super Resolution) variables
-
+# FShack and FSR (AMD FidelityFX Super Resolution) variables
 export WINE_FULLSCREEN_FSR=1
 export WINE_FULLSCREEN_FSR_STRENGTH=2
 #export WINE_FULLSCREEN_FSR_MODE="ultra"
@@ -137,16 +91,13 @@ export WINE_FULLSCREEN_FSR_STRENGTH=2
 #export WINE_DISABLE_FULLSCREEN_HACK=1
 #export WINE_DISABLE_VK_CHILD_WINDOW_RENDERING_HACK=1
 
-## Disable pesky winemenubuilder which pollutes application menus
-
+# Disable pesky winemenubuilder which pollutes application menus
 export WINEDLLOVERRIDES="winemenubuilder.exe="
 
-## Set the cache directory
+# Set the cache directory
+export XDG_CACHE_HOME="${scriptdir}/cache"
 
-export XDG_CACHE_HOME="${scriptdir}"/cache
-
-## Nvidia-related variables
-
+# Nvidia-related variables
 export __GL_SHADER_DISK_CACHE_SIZE=2147483648
 export __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
 #export __GL_SHADER_DISK_CACHE_PATH="${XDG_CACHE_HOME}"/nvidia
@@ -154,20 +105,13 @@ export __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
 #export WINE_HIDE_NVIDIA_GPU=1
 #export WINE_GL_HIDE_NVIDIA=1
 
-## Enable DLSS and raytracing support in games on RTX Nvidia GPUs
-## Note that simply enabling this variable is not enough for DLSS to work
-## You will also need to put nvapi64.dll (from dxvk-nvapi) into game_info/dlls
-## And you will probably need to use Wine-Proton instead of regular Wine
-## And, of course, also latest DXVK and vkd3d-proton and not very old
-## videodrivers
-
+# Enable DLSS and raytracing support in games on RTX Nvidia GPUs
 export ENABLE_RT_DLSS=0
 
-## DXVK variables
-
-export DXVK_LOG_PATH="${XDG_CACHE_HOME}"/dxvk
-export DXVK_STATE_CACHE_PATH="${XDG_CACHE_HOME}"/dxvk
-export DXVK_CONFIG_FILE="${scriptdir}"/dxvk.conf
+# DXVK variables
+export DXVK_LOG_PATH="${XDG_CACHE_HOME}/dxvk"
+export DXVK_STATE_CACHE_PATH="${XDG_CACHE_HOME}/dxvk"
+export DXVK_CONFIG_FILE="${scriptdir}/dxvk.conf"
 export DXVK_LOG_LEVEL=none
 export DXVK_HUD=0
 export DISABLE_DXVK=0
@@ -175,12 +119,10 @@ export DISABLE_DXVK=0
 #export DXVK_FRAME_RATE=60
 #export DXVK_FILTER_DEVICE_NAME="AMD"
 
-## This variable works only with DXVK with the async patch applied
-
+# This variable works only with DXVK with the async patch applied
 export DXVK_ASYNC=1
 
-## VKD3D variables
-
+# VKD3D variables
 export USE_BUILTIN_VKD3D=0
 export VKD3D_DEBUG=none
 export VKD3D_SHADER_DEBUG=none
@@ -189,95 +131,67 @@ export VKD3D_SHADER_MODEL=6_7
 #export VKD3D_FEATURE_LEVEL=12_2
 #export VKD3D_FILTER_DEVICE_NAME="AMD"
 
-## Wine-Staging variables
-
+# Wine-Staging variables
 #export STAGING_SHARED_MEMORY=1
 #export STAGING_WRITECOPY=1
 
-## Set realtime priority for the wineserver
-## This usually improves performance
-## 99 is the highest, but is not recommended.
-##
-## This requires the ability to set realtime priorities for processes
-## This ability can be configured in /etc/security/limits.conf
-
+# Set realtime priority for the wineserver
 #export STAGING_RT_PRIORITY_SERVER=90
 
-## If this is enabled, the script will store the Wine prefix and the documents
-## directory in /home/username/.local/share/games/GAMENAME
-##
-## Enable this if you are using NTFS filesystem and encounter problems
-## starting the game.
-
+# If this is enabled, the script will store the Wine prefix and the documents
+# directory in /home/username/.local/share/games/GAMENAME
 export NTFS_MODE=0
 
-## File descriptors limit for Esync
-## Values lower than 1 million are not recommended
-## ESYNC will be automatically disabled by the script if ulimit
-## fails to set the required limit
-##
-## This requires the ability to increase file descriptors limit
-## This ability can be configured in /etc/security/limits.conf
-
+# File descriptors limit for Esync
 export ULIMIT_SIZE=1000000
 
-## Enable Wine virtual desktop
-
+# Enable Wine virtual desktop
 export VIRTUAL_DESKTOP=0
 export VIRTUAL_DESKTOP_SIZE="1280x720"
 
-## Restore screen resolution after Wine terminates
-
+# Restore screen resolution after Wine terminates
 export RESTORE_RESOLUTION=0
 
-## Set the locale. This is useful for games that set their language
-## depending on the system locale being used.
-
+# Set the locale. This is useful for games that set their language
+# depending on the system locale being used.
 #export LANG=ru_RU.UTF-8
 
-## Useful when a game doesn't work
-
+# Useful when a game doesn't work
 export ENABLE_DEBUG=0
 
-## Disable dlls. Comma separated list.
-
+# Disable dlls. Comma separated list.
 #export DISABLE_DLLS="winegstreamer,d3d12"
 
-## May be useful for games with native OpenGL renderer on AMD/Intel GPUs
-
+# May be useful for games with native OpenGL renderer on AMD/Intel GPUs
 #export mesa_glthread=true
 
-## Enable MangoHud for Vulkan applications if it's installed
-
+# Enable MangoHud for Vulkan applications if it's installed
 #export MANGOHUD=1
 
-## Make Wine binaries executable
-
+# Make Wine binaries executable
 if [ -f "${WINE}" ] && [ ! -x "${WINE}" ]; then
-	chmod +x "${WINE}"
+  chmod +x "${WINE}"
 fi
 
 if [ -f "${WINE64}" ] && [ ! -x "${WINE64}" ]; then
-	chmod +x "${WINE64}"
+  chmod +x "${WINE64}"
 fi
 
 if [ -f "${WINESERVER}" ] && [ ! -x "${WINESERVER}" ]; then
-	chmod +x "${WINESERVER}"
+  chmod +x "${WINESERVER}"
 fi
 
-## If a Wine build is fully 64-bit, make a symlink from wine64 to wine
-
+# If a Wine build is fully 64-bit, make a symlink from wine64 to wine
 if [ ! -f "${WINE}" ] && [ -f "${WINE64}" ]; then
-	cp "${WINE64}" "${WINE}"
+  cp "${WINE64}" "${WINE}"
 fi
 
 script_name="$(basename "${script}" | cut -d. -f1)"
 settings_file=settings_"${script_name}"
 
-## Generate settings file
-
+# Generate settings file
 if [ ! -f "${settings_file}" ]; then
-	cat <<EOF > "${settings_file}"
+  cat <<EOF > "${settings_file}"
 export USE_SYSTEM_WINE=${USE_SYSTEM_WINE}
 export RESTORE_RESOLUTION=${RESTORE_RESOLUTION}
 export VIRTUAL_DESKTOP=${VIRTUAL_DESKTOP}
@@ -340,62 +254,55 @@ fi
 source "${settings_file}"
 
 if [ -n "${DISABLE_DLLS}" ]; then
-	export WINEDLLOVERRIDES="${DISABLE_DLLS}=;${WINEDLLOVERRIDES}"
+  export WINEDLLOVERRIDES="${DISABLE_DLLS}=;${WINEDLLOVERRIDES}"
 fi
 
-## Use system Wine if needed
-
+# Use system Wine if needed
 if [ ! -f "${WINE}" ] || [ "${USE_SYSTEM_WINE}" = 1 ]; then
-	export WINE=wine
-	export WINE64=wine64
-	export WINESERVER=wineserver
-
-	USE_SYSTEM_WINE=1
+  export WINE=wine
+  export WINE64=wine64
+  export WINESERVER=wineserver
+  USE_SYSTEM_WINE=1
 fi
 
-## Check if the Wine binary works at all
-
+# Check if the Wine binary works at all
 if ! "${WINE}" --version &>/dev/null; then
-	"${WINE}" --version
-	echo "There is a problem running Wine binary!"
-	exit 1
+  "${WINE}" --version
+  echo "There is a problem running Wine binary!"
+  exit 1
 fi
 
-## Disable ESYNC if ulimit fails to set the minimum required limit
-
+# Disable ESYNC if ulimit fails to set the minimum required limit
 ulimit_hardlimit="$(ulimit -Hn)"
 if [ "${ulimit_hardlimit}" -ge ${ULIMIT_SIZE} ]; then
-	ulimit -n "${ulimit_hardlimit}" 2>/dev/null
+  ulimit -n "${ulimit_hardlimit}" 2>/dev/null
 else
-	export WINEESYNC=0
+  export WINEESYNC=0
 fi
 
-## Disable restoring screen resolution if there is no xrandr
-
+# Disable restoring screen resolution if there is no xrandr
 if ! command -v xrandr 1>/dev/null; then
-	export RESTORE_RESOLUTION=0
+  export RESTORE_RESOLUTION=0
 fi
 
-## Check if sed is installed
-
+# Check if sed is installed
 if ! command -v sed 1>/dev/null; then
-	echo "Please install sed and run the script again."
-	exit 1
+  echo "Please install sed and run the script again."
+  exit 1
 fi
 
-## Use the game_info_SCRIPTNAME.txt file if it exists
-## Otherwise use the game_info.txt file
-
-if [ -f "${scriptdir}"/game_info/game_info_"${script_name}".txt ]; then
-	GAME_INFO="$(cat "${scriptdir}"/game_info/game_info_"${script_name}".txt)"
+# Use the game_info_SCRIPTNAME.txt file if it exists
+# Otherwise use the game_info.txt file
+if [ -f "${scriptdir}/game_info/game_info_${script_name}.txt" ]; then
+  GAME_INFO="$(cat "${scriptdir}/game_info/game_info_${script_name}.txt")"
 else
-	GAME_INFO="$(cat "${scriptdir}"/game_info/game_info.txt)"
+  GAME_INFO="$(cat "${scriptdir}/game_info/game_info.txt")"
 fi
 
 if [ -z "${GAME_INFO}" ]; then
-	clear
-	echo "There is no game_info.txt file!"
-	exit 1
+  clear
+  echo "There is no game_info.txt file!"
+  exit 1
 fi
 
 VERSION="$(echo "${GAME_INFO}" | sed -n 2p)"
@@ -404,34 +311,31 @@ ARGS="$(echo "${GAME_INFO}" | sed -n 4p)"
 ADDITIONAL_PATH="$(echo "${GAME_INFO}" | sed -n 5p)"
 GAME="$(echo "${GAME_INFO}" | sed -n 6p)"
 
-ntfs_mode () {
-	mkdir -p "${HOME}"/.local/share/games/"${GAME}"
-
-	export XDG_CACHE_HOME="${HOME}"/.local/share/games/"${GAME}"/cache
-	export WINEPREFIX="${HOME}"/.local/share/games/"${GAME}"/prefix
-	export DOCUMENTS_DIR="${HOME}"/.local/share/games/"${GAME}"/documents
-	export TEMPFILES_DIR="${HOME}"/.local/share/games/"${GAME}"/temp_files
+ntfs_mode() {
+  mkdir -p "${HOME}/.local/share/games/${GAME}"
+  export XDG_CACHE_HOME="${HOME}/.local/share/games/${GAME}/cache"
+  export WINEPREFIX="${HOME}/.local/share/games/${GAME}/prefix"
+  export DOCUMENTS_DIR="${HOME}/.local/share/games/${GAME}/documents"
+  export TEMPFILES_DIR="${HOME}/.local/share/games/${GAME}/temp_files"
 }
 
 if [ "${NTFS_MODE}" = 1 ] || \
-   [ -f "${HOME}"/.local/share/games/"${GAME}"/temp_files/force_ntfs_mode ] || \
-   ! touch "${scriptdir}"/write_test &>/dev/null; then
-		export NTFS_MODE=1
-		ntfs_mode
+   [ -f "${HOME}/.local/share/games/${GAME}/temp_files/force_ntfs_mode" ] || \
+   ! touch "${scriptdir}/write_test" &>/dev/null; then
+  export NTFS_MODE=1
+  ntfs_mode
 fi
-rm -f "${scriptdir}"/write_test
+rm -f "${scriptdir}/write_test"
 
-GAME_PATH="${WINEPREFIX}"/drive_c/"$(echo "${GAME_INFO}" | sed -n 1p)"
+GAME_PATH="${WINEPREFIX}/drive_c/$(echo "${GAME_INFO}" | sed -n 1p)"
 
-## Function for retreiving a list of files of the game_info directory
-## When the list of files changes, the WINEPREFIX is recreated
-
+# Function for retrieving a list of files of the game_info directory
 list_game_info_content() {
-	for dir in game_info/*/; do
-		if [ "${dir}" != "game_info/data/" ]; then
-			GAME_INFO_CONTENT="$(LC_ALL=C ls "${dir}" 2>/dev/null) ${GAME_INFO_CONTENT}"
-		fi
-	done
+  for dir in game_info/*/; do
+    if [ "${dir}" != "game_info/data/" ]; then
+      GAME_INFO_CONTENT="$(LC_ALL=C ls "${dir}" 2>/dev/null) ${GAME_INFO_CONTENT}"
+    fi
+  done
 }
 
 ## A function to download winetricks
