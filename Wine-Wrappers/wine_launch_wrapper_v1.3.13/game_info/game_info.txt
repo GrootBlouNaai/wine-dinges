@@ -1,0 +1,23 @@
+путь_к_игре_относительно_drive_c / path_to_the_game_directory_realative_to_drive_c
+версия_игры / the_game_version_string
+исполняемый_файл_игры / the_game_executable_file
+параметры_запуска_игры / the_game_launch_arguments
+дополнительный_путь_к_исполняемому_файлу / additional_path_to_the_game_executable
+название_игры / the_game_name
+
+--------------------------------------------------------------------
+
+Пример файла game_info.txt / The example of the game_info.txt file:
+
+Program Files/The Super Game
+1.0.0
+Game.exe
+-language=russian
+bin
+The Super Game: Deluxe Edition
+
+Обязательно соблюдайте нумерацию строк. Если какие-то строки не
+используются, просто оставляйте их пустыми но не удаляйте.
+
+It's important to follow the line numbering. If some lines are
+not used, just leave them empty and don't remove.

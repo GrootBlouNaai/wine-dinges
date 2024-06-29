@@ -1,0 +1,164 @@
+05.03.19 v1.2:
+	* Script now accepts additional arguments as arguments for the application
+		executable. For example, for launching the game with -opengl -nodx
+		arguments launch the script with the same arguments:
+		./start.sh -opengl -nodx
+	* Added the ability to use winetricks in tools.sh script
+	* Added the ability to use winetricks for installing components and
+		applying tweaks during prefix creation. Add components/tweaks names
+		into game_info/winetricks_list.txt file and winetricks will automatically
+		install them. Winetricks itself will be downloaded by script automatically
+		if it's not installed.
+		More info in game_info/readme_en.txt file.
+	* Script now uses XDG_CACHE_HOME directory for storing cache directory
+		near itself. This directory is used for storing fonts caches, shader
+		caches, etc. And it's also used for
+		files that winetricks downloads.
+	* Cache and log files of DXVK now stores in cache/dxvk directory.
+	* Most variable from settings_SCRIPTNAME file are renamed to be more
+		meaningful.
+	* Script now output more useful information during prefix creation
+		and hides useless information.
+	* Script output redirection to different file removed as it
+		breaks some games (For example, The Sims 4)
+	* Resolution restoration is now correctly works with multi-monitor
+		configurations (thanks to guys from RuTracker).
+	* Using of game_info/additional directory is changed and simplified.
+		It now uses directories that match the real one.
+		More info in game_info/readme_en.txt file.
+	* File descriptors limit rises to 500k when ESYNC is enabled, because
+		the old 100k isn't enough for some games.
+	* GLIBC version checking is added back.
+	* Documentation updated.
+	* Some additional fixes and impovements.
+=======================================================================
+14.03.19 v1.2.1:
+	* Fixed recreating prefixes on every script launch when Proton is used
+	* Directory drive_c/users/Public is now stores in documents directory
+		as sometimes applications stores there saves and settings
+	* Some additional fixes
+=======================================================================
+15.03.19 v1.2.2:
+	* Fixed GLIBC version checking, it now correctly works in different
+		Linux distros and it correctly works with versions with two
+		dots in output (like 2.14.1)
+	* Added two variables to control GLIBC checking: one for disabling
+		version checking and another for changing required version
+	* Added using of wine-development if it's available when using system Wine
+	* Added architecture checking for prefix and Wine, if they are not match
+		script will warn you and exit.
+=======================================================================
+18.01.21 v1.3:
+	* Lots of bug fixes
+	* Removed old, irrelevant and useless (in my opinion) code
+	* Removed some environment variables and functions
+	* Added new environment variables and functions (for example, added
+		the ability to disable dll using the variable)
+	* Removed the --debug launch parameter, ENABLE_DEBUG variable replaces
+		it now
+	* The functions of the tools.sh script have been merged into the start.sh
+		script
+	* ProgramData directory now moves outside the prefix into the documents
+		directory, because some games store their saves and settings in it
+	* Added the ability to set custom path to the documents directory
+	* Added the ability to enable NTFS_MODE for the cases when a user
+		have problems running a game on NTFS filesystem
+	* .temp_files directory renamed to temp_files (without a dot, so is not hidden now)
+	* Some other improvements
+=======================================================================
+18.01.21 v1.3.1:
+    * Fixed a bug with NTFS_MODE
+=======================================================================
+19.01.21 v1.3.2:
+	* Added the ability to force the script to remove old prefixes instead
+		of renaming them (REMOVE_OLD_PREFIXES variable)
+	* Added error handling during the prefix initialization
+	* Improved handling of the script launch arguments
+	* Enabled the Wine prefix recreation when content of the game_info directory
+		changes
+	* Added variable VIRTUAL_DESKTOP_SIZE
+=======================================================================
+19.01.21 v1.3.3:
+	* Variables NICE_LEVEL and STAGING_RT_PRIORITY_SERVER are disabled by
+		default now
+=======================================================================
+26.01.21 v1.3.4:
+	* Added the "--fm" launch parameter to run Wine file manager.
+	* Restored the "--debug" launch parameter to show more information
+		when running Wine. You can now use both the ENABLE_DEBUG variable
+		and this launch parameter, depending on what is more convenient for you.
+	* Restored and fixed the function for restoring screen resolution after
+		exiting Wine.
+	* Fixed the Documents_Multilocale directory usage for Proton.
+=======================================================================
+05.09.21 v1.3.5:
+	* Fixed hang when creating a prefix on some systems
+		(https://bugs.winehq.org/show_bug.cgi?id=51086)
+	* Added winetricks dependecy check
+	* A separate directory is now used for the winetricks download cache
+	* Added more environment variables
+=======================================================================
+05.09.21 v1.3.6:
+	* The fix for hangs when creating a prefix is disabled by default
+		now, because it causes issues with video playback in some games.
+		It can be enabled with the PREFIX_HANG_FIX environment variable.
+=======================================================================
+05.09.21 v1.3.7:
+	* Added the --shortcuts launch argument to add shortcuts to launch the script
+		on the desktop and the applications menu
+=======================================================================
+21.10.21 v1.3.8:
+	* Removed unrar from the winetricks dependency check
+	* Fixed display of desktop files icon
+=======================================================================
+29.10.21 v1.3.9:
+	* Removed 7z and xz from the winetricks dependency check
+=======================================================================
+07.08.22 v1.3.10:
+	* Added USE_BUILTIN_VKD3D environemnt variable, which enabled the usage
+		of Wine's builtin VKD3D instead of VKD3D-proton
+	* When creating a prefix, wineboot output is now saved to temp_files/wineboot.log
+	* When creating a prefix, system information is now saved to temp_files/sysinfo
+	* If a game or Wine crashes or fails to launch, debug mode is automatically
+		enabled for the next run of the script
+	* Scripts now automatically unsets the SDL_AUDIODRIVER environment variable
+		to avoid problems with Windows games that use SDL
+	* Some other small fixes and improvements
+=======================================================================
+21.10.23 v1.3.11:
+	* Launch argument "--clean" renamed to "--clear"
+	* Added new environment variables from Proton, DXVK and vkd3d-proton
+	* RESTORE_RESOLUTION disabled by default, because it was setting
+		the refresh rate incorrectly on some systems.
+	* The script now automatically enables NTFS_MODE if Wine fails to
+		create prefix and if the script detect that a game is stored
+		on NTFS, exFAT or FAT partition. NTFS_MODE is also automatically
+		enabled if there is no write permission on the directory where
+		the script resides.
+	* If system has a higher file descriptors limit than specified in the
+		script, the script uses the system limit.
+	* The script takes into account translated names of the desktop
+		directory when creating desktop files.
+	* The script now show information about the system when debug mode
+		is enabled.
+	* The script now takes into account syswow64 and system32 directories
+		in game_info/dlls. For example, if you want the script to copy
+		libraries into windows/syswow64, you need to put them into
+		game_info/dlls/syswow64 directory. You can still simply put them
+		into the root of game_info/dlls, in which case they will be copied
+		to system32.
+	* Removed some rarely used functions and features.
+	* Added the ability to enable DLSS support on modern Nvidia GPUs.
+		It can be enabled with ENABLE_RT_DLSS variable. Apart from
+		enabling the env variable, you will also need to put nvapi64.dll
+		(from dxvk-nvapi) into game_info/dlls. Of course, latest DXVK,
+		vkd3d-proton and not very old videodrivers are also needed, and
+		a game must support DLSS too.
+	* Other minor improvements and bugfixes.
+=======================================================================
+31.01.24 v1.3.12:
+	* Disabled regsvr32 windows for new Wine versions
+=======================================================================
+18.02.24 v1.3.13:
+	* Fixed shader caching on Nvidia GPUs
+	* Fixed GPU model detection when using Nvidia GPUs
